@@ -1,11 +1,10 @@
 
+import streamlit as st
 import json
 import re
-
 import requests
-import streamlit as st
 from PIL import Image
-import google.generativeai as genai
+from google import genai
 
 # --------------------------------------------------
 # PAGE CONFIGURATION
@@ -32,6 +31,7 @@ try:
 except Exception as e:
     st.error(f"Configuration error: {e}")
     st.stop()
+
 
 
 
