@@ -1,0 +1,11 @@
+streamlit>=1.38
+pandas>=2.0
+requests>=2.31
+Pillow>=10.0
+pytesseract>=0.3.10
+openpyxl>=3.1
+
+streamlit
+gspread
+oauth2client
+google-generativeai
