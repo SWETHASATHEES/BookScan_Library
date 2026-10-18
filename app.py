@@ -19,17 +19,11 @@ st.set_page_config(
 # --------------------------------------------------
 # SECRETS & API SETUP
 # --------------------------------------------------
-try:
-    GEMINI_API_KEY = st.secrets["GEMINI_API_KEY"]
-    APPS_SCRIPT_URL = st.secrets["APPS_SCRIPT_URL"]
-except Exception:
-    st.error(
-        "Configuration missing. Check GEMINI_API_KEY and "
-        "APPS_SCRIPT_URL in .streamlit/secrets.toml."
-    )
-    st.stop()
+from google import genai
 
+GEMINI_API_KEY = st.secrets["GEMINI_API_KEY"]
 client = genai.Client(api_key=GEMINI_API_KEY.strip())
+
 
 # --------------------------------------------------
 # GEMINI BOOK DETAILS EXTRACTION
@@ -37,7 +31,9 @@ client = genai.Client(api_key=GEMINI_API_KEY.strip())
 
 def extract_book_details(image):
     prompt = """
-    Examine this book cover or title page and extract:
+    Examine the uploaded book cover, title page, or copyright page.
+
+    Extract these fields:
     1. title
     2. author
     3. publisher
@@ -47,37 +43,65 @@ def extract_book_details(image):
     7. edition
     8. subjects: brief comma-separated keywords
 
-    Preserve Malayalam titles and author names in Malayalam script.
-    Do not invent information that is not visible.
-    Use an empty string for missing details.
-
-    Return only a valid JSON object with these exact keys:
-    title, author, publisher, language, category, price, edition, subjects.
+    IMPORTANT:
+    - Preserve Malayalam titles and author names in Malayalam script.
+    - Do not translate Malayalam names into English.
+    - Do not invent missing information.
+    - Use an empty string for information that is not visible.
+    - Return only a valid JSON object with these exact keys:
+      title, author, publisher, language, category, price,
+      edition, subjects.
     """
 
-    response = client.models.generate_content(
-        model="gemini-3.8-flash",
-        contents=[prompt, image],
-    )
+    try:
+        response = client.models.generate_content(
+            model="gemini-2.5-flash",
+            contents=[prompt, image],
+            config={
+                "response_mime_type": "application/json"
+            },
+        )
 
-    text = response.text.strip()
+        if not response.text:
+            raise ValueError("Gemini returned an empty response.")
 
-    if text.startswith("```"):
-        text = text.removeprefix("```json").removeprefix("```")
-        text = text.removesuffix("```").strip()
+        text = response.text.strip()
 
-    data = json.loads(text)
+        # Remove Markdown code fences if present.
+        if text.startswith("```"):
+            lines = text.splitlines()
+            if lines and lines[0].startswith("```"):
+                lines = lines[1:]
+            if lines and lines[-1].strip() == "```":
+                lines = lines[:-1]
+            text = "\n".join(lines).strip()
 
-    keys = [
-        "title", "author", "publisher", "language",
-        "category", "price", "edition", "subjects"
-    ]
+        data = json.loads(text)
 
-    return {
-        key: str(data.get(key, "") or "")
-        for key in keys
-    }
+        keys = [
+            "title",
+            "author",
+            "publisher",
+            "language",
+            "category",
+            "price",
+            "edition",
+            "subjects",
+        ]
 
+        return {
+            key: str(data.get(key, "") or "")
+            for key in keys
+        }
+
+    except json.JSONDecodeError as e:
+        raise ValueError(
+            "Gemini returned invalid JSON. Please try another image."
+        ) from e
+    except Exception as e:
+        raise RuntimeError(
+            f"Book detail extraction failed: {e}"
+        ) from e
 
 # --------------------------------------------------
 # SAVE TO GOOGLE SHEETS THROUGH APPS SCRIPT
