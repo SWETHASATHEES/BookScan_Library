@@ -4,7 +4,7 @@ import re
 
 import requests
 import streamlit as st
-import google.generativeai as genai
+from google import genai
 from PIL import Image
 
 # --------------------------------------------------
@@ -29,19 +29,15 @@ except Exception:
     )
     st.stop()
 
-genai.configure(api_key=GEMINI_API_KEY)
-
+client = genai.Client(api_key=GEMINI_API_KEY.strip())
 
 # --------------------------------------------------
 # GEMINI BOOK DETAILS EXTRACTION
 # --------------------------------------------------
+
 def extract_book_details(image):
-    model = genai.GenerativeModel("gemini-3.8-flash")
-
     prompt = """
-    Examine this book cover or title/copyright page.
-
-    Extract the following details:
+    Examine this book cover or title page and extract:
     1. title
     2. author
     3. publisher
@@ -49,30 +45,26 @@ def extract_book_details(image):
     5. category
     6. price
     7. edition
-    8. subjects: short comma-separated keywords
+    8. subjects: brief comma-separated keywords
 
-    IMPORTANT:
-    - Preserve Malayalam titles and author names in Malayalam script.
-    - Do not translate Malayalam names into English.
-    - Do not invent missing details.
-    - Use an empty string for information that is not visible.
-    - Return only a valid JSON object with these exact keys:
-      title, author, publisher, language, category, price,
-      edition, subjects.
+    Preserve Malayalam titles and author names in Malayalam script.
+    Do not invent information that is not visible.
+    Use an empty string for missing details.
+
+    Return only a valid JSON object with these exact keys:
+    title, author, publisher, language, category, price, edition, subjects.
     """
 
-    response = model.generate_content([prompt, image])
+    response = client.models.generate_content(
+        model="gemini-3.8-flash",
+        contents=[prompt, image],
+    )
 
     text = response.text.strip()
-    text = re.sub(r"^```(?:json)?\s*", "", text)
-    text = re.sub(r"\s*```$", "", text)
 
-    # Handle JSON surrounded by extra explanatory text.
-    if not text.startswith("{"):
-        start = text.find("{")
-        end = text.rfind("}")
-        if start != -1 and end > start:
-            text = text[start:end + 1]
+    if text.startswith("```"):
+        text = text.removeprefix("```json").removeprefix("```")
+        text = text.removesuffix("```").strip()
 
     data = json.loads(text)
 
