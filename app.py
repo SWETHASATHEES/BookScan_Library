@@ -4,8 +4,8 @@ import re
 
 import requests
 import streamlit as st
-from google import genai
 from PIL import Image
+import google.generativeai as genai
 
 # --------------------------------------------------
 # PAGE CONFIGURATION
@@ -19,10 +19,20 @@ st.set_page_config(
 # --------------------------------------------------
 # SECRETS & API SETUP
 # --------------------------------------------------
-from google import genai
 
-GEMINI_API_KEY = st.secrets["GEMINI_API_KEY"]
-client = genai.Client(api_key=GEMINI_API_KEY.strip())
+
+try:
+    GEMINI_API_KEY = st.secrets["GEMINI_API_KEY"]
+    APPS_SCRIPT_URL = st.secrets["APPS_SCRIPT_URL"]
+
+    client = genai.Client(
+        api_key=GEMINI_API_KEY.strip()
+    )
+
+except Exception as e:
+    st.error(f"Configuration error: {e}")
+    st.stop()
+
 
 
 # --------------------------------------------------
