@@ -116,32 +116,38 @@ def extract_book_details(image):
 # --------------------------------------------------
 # SAVE TO GOOGLE SHEETS THROUGH APPS SCRIPT
 # --------------------------------------------------
-def save_to_google_sheet(row):
-    payload = {"row": row}
 
+def save_to_google_sheet(row):
     response = requests.post(
         APPS_SCRIPT_URL,
-        json=payload,
+        json={"row": row},
         timeout=30,
+        allow_redirects=True,
     )
 
-    response.raise_for_status()
+    if response.status_code != 200:
+        raise RuntimeError(
+            f"Google Apps Script returned HTTP "
+            f"{response.status_code}. "
+            f"Final URL: {response.url}. "
+            f"Response: {response.text[:500]}"
+        )
 
     try:
         result = response.json()
-    except ValueError:
+    except ValueError as e:
         raise RuntimeError(
-            "Apps Script did not return JSON. Check the deployment "
-            "URL and ensure the web app is deployed correctly."
-        )
+            "Google returned a non-JSON response. "
+            "Check deployment permissions and URL. "
+            f"Response: {response.text[:500]}"
+        ) from e
 
-    if not result.get("success", False):
+    if not result.get("success"):
         raise RuntimeError(
-            result.get("error", "Apps Script could not save the record.")
+            result.get("error", "The spreadsheet did not save the record.")
         )
 
     return result
-
 
 # --------------------------------------------------
 # STREAMLIT UI
